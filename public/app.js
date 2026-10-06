@@ -1,40 +1,76 @@
-const phase = document.querySelector("#phase");
-const message = document.querySelector("#message");
-const start = document.querySelector("#start");
-const continueButton = document.querySelector("#continue");
-const requestIdText = document.querySelector("#request-id");
-let requestId;
-let pollTimer;
+const $ = selector => document.querySelector(selector);
+const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+const params = new URLSearchParams(location.search), openingId=params.get('opening'), offerId=params.get('offer');
+const isClient=Boolean(openingId && offerId), encode=encodeURIComponent;
+const labels={contacting:'Contacting',waiting:'Awaiting reply',filled:'Filled',canceled:'Canceled',unfilled:'Needs attention',sending:'Sending',accepted:'Accepted',declined:'Declined',timed_out:'Timed out',delivery_failed:'Delivery failed'};
+let latestOpenings=[],clientState,refreshBusy=false,responding=false,configReady=false,lastClientMarkup='',lastStaffState='';
+const fmt=(value,options)=>new Intl.DateTimeFormat(undefined,options).format(new Date(value));
+const dateTime=value=>fmt(value,{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit',second:'2-digit',timeZoneName:'short'});
+const countdown=deadline=>{const remaining=Math.max(0,Math.ceil((deadline-Date.now())/1000));return remaining>0?`${Math.floor(remaining/60)}:${String(remaining%60).padStart(2,'0')} to reply`:'Deadline reached';};
+const badge=status=>`<span class="badge ${esc(status)}">${esc(labels[status]||status)}</span>`;
+const clientLink=(id,offer)=>`/?opening=${encode(id)}&offer=${encode(offer.id)}`;
+async function api(path,options={}){const response=await fetch(path,{headers:{'Content-Type':'application/json'},...options});let body;try{body=await response.json();}catch{throw new Error('The front desk is temporarily unavailable. Please try again.');}if(!response.ok)throw new Error(body.message||body.error||'The request could not be completed. Please try again.');return body;}
+const localInputDate=date=>new Date(date.getTime()-date.getTimezoneOffset()*60000).toISOString().slice(0,16);
 
-async function refresh() {
-  if (!requestId) return;
-  const response = await fetch(`/api/demo/${requestId}`);
-  const status = await response.json();
-  if (!response.ok) {
-    phase.textContent = "Waiting for Worker";
-    message.textContent = "Temporal has the request and will continue when a Worker is available.";
-    return;
-  }
-  phase.textContent = status.phase;
-  message.textContent = status.message;
-  continueButton.hidden = status.phase !== "waiting";
-  if (status.phase === "complete") clearInterval(pollTimer);
+function renderOpenings(){
+ const signature=JSON.stringify(latestOpenings);if(signature===lastStaffState)return;lastStaffState=signature;
+ const expanded=new Set([...document.querySelectorAll('.history[open]')].map(item=>item.dataset.id));
+ $('#count-active').textContent=latestOpenings.filter(s=>['contacting','waiting'].includes(s.status)).length;
+ $('#count-filled').textContent=latestOpenings.filter(s=>s.status==='filled').length;
+ $('#count-attention').textContent=latestOpenings.filter(s=>s.status==='unfilled'||s.alerts?.length).length;
+ const filled=latestOpenings.filter(s=>s.status==='filled').length;
+ const completed=latestOpenings.filter(s=>['filled','unfilled'].includes(s.status)).length;
+ const active=latestOpenings.filter(s=>['contacting','waiting'].includes(s.status)).length;
+ const canceled=latestOpenings.filter(s=>s.status==='canceled').length;
+ $('#refill-rate').textContent=completed?`${filled} of ${completed} completed openings · ${Math.round(filled/completed*100)}%`:'No completed openings yet';
+ $('#refill-excluded').textContent=`${active} in progress · ${canceled} staff-canceled · excluded from rate`;
+ if(!latestOpenings.length)return;
+ $('#openings-list').innerHTML=latestOpenings.map(state=>{
+  const opening=state.opening,offers=state.offers||[],current=offers.find(o=>o.id===state.currentOfferId),active=['contacting','waiting'].includes(state.status);
+  let body='';
+  if(active&&current){body=`<div class="offer-box"><div class="offer-heading"><span class="offer-kicker">${current.status==='sending'?'PREPARING AN OFFER FOR':'CURRENT OFFER HOLDER'}</span><span class="message-label">Simulated message</span></div><p class="offer-name">${esc(current.clientName)}</p><p class="offer-line">Reply by <span class="offer-deadline">${esc(dateTime(current.deadline))}</span></p><p class="countdown" data-deadline="${Number(current.deadline)}">${countdown(current.deadline)}</p><p class="offer-message">${esc(current.message||'An earlier appointment is available. Please reply before the deadline.')}</p>${current.status==='waiting'?`<a class="button secondary" href="${clientLink(state.id,current)}" target="_blank" rel="noopener">Open client offer ↗</a>`:'<p class="offer-line">Sending the offer…</p>'}</div>`;}
+  else if(state.status==='filled'){body=`<div class="opening-result"><strong>Booked for ${esc(state.confirmedClient?.name||offers.find(o=>o.status==='accepted')?.clientName||'your client')}.</strong><br />The appointment is confirmed in this demo. Outreach has stopped.</div>`;}
+  else if(state.status==='canceled'){body='<div class="opening-result"><strong>Outreach canceled.</strong><br />No more offers will be sent. Previous offers can no longer be accepted.</div>';}
+  else if(state.status==='unfilled'){body='<div class="opening-result unfilled"><strong>This opening needs your attention.</strong><br />The process ended without a confirmed booking. Review the history below.</div>';}
+  else{body='<div class="opening-result">Finding the next suitable client…</div>';}
+  const alerts=(state.alerts||[]).map(alert=>`<div class="alert-item"><strong>Staff alert:</strong> ${esc(alert)}</div>`).join('');
+  const history=(state.history||[]).map(event=>`<li><time datetime="${new Date(event.at).toISOString()}" title="${esc(dateTime(event.at))}">${esc(fmt(event.at,{hour:'numeric',minute:'2-digit',second:'2-digit'}))}</time><span>${esc(event.message)}</span></li>`).join('');
+  const archive=offers.filter(o=>o.status!=='sending').map(o=>`<a href="${clientLink(state.id,o)}" target="_blank" rel="noopener">${esc(o.clientName)} · ${esc(labels[o.status]||o.status)} ↗</a>`).join('');
+  return `<article class="opening-card" data-opening="${esc(state.id)}"><div class="opening-top"><div><h3 class="opening-title">${esc(opening.service)}</h3><p class="opening-subtitle">${esc(dateTime(opening.startsAt))}<br />${esc(opening.stylist)} · ${esc(opening.durationMinutes)} min</p></div>${badge(state.status)}</div>${body}${alerts}<div class="opening-bottom"><span class="eligibility">${Number(state.eligibleCount||0)} suitable client${state.eligibleCount===1?'':'s'} · earliest joined first</span>${active?`<button class="cancel-button" data-cancel="${esc(state.id)}" type="button">Cancel outreach</button>`:'<span class="eligibility">Process complete</span>'}</div><details class="history" data-id="${esc(state.id)}" ${expanded.has(state.id)?'open':''}><summary>Activity history · ${(state.history||[]).length} events</summary><ol class="history-list">${history||'<li><span>Waiting for the first event…</span></li>'}</ol>${archive?`<div class="offer-archive">${archive}</div>`:''}</details></article>`;
+ }).join('');
 }
+async function refreshStaff(){if(refreshBusy)return;refreshBusy=true;try{const result=await api('/api/openings');latestOpenings=(Array.isArray(result)?result:result.openings||[]).sort((a,b)=>b.createdAt-a.createdAt);renderOpenings();$('#connection-status').classList.remove('error');$('#connection-status').textContent=`Live view · Updated ${fmt(Date.now(),{hour:'numeric',minute:'2-digit'})}`;}catch(error){$('#connection-status').classList.add('error');$('#connection-status').textContent=`${error.message} Showing the last known state.`;}finally{refreshBusy=false;}}
+async function loadConfig(){if(configReady)return;try{const config=await api('/api/config');$('#service').innerHTML=config.services.map(s=>`<option value="${esc(s.name)}">${esc(s.name)} · ${s.durationMinutes} min</option>`).join('');$('#stylist').innerHTML=config.stylists.map(s=>`<option>${esc(s)}</option>`).join('');$('#service').disabled=false;$('#stylist').disabled=false;$('#start-button').disabled=false;$('#sample-count').textContent=config.clients.length;$('#sample-clients').innerHTML=[...config.clients].sort((a,b)=>a.joinedAt-b.joinedAt).map((c,i)=>`<div class="sample-client"><strong>${i+1}. ${esc(c.name)}</strong><p>${esc(c.service)} · ${esc(c.stylist||'Any stylist')}<br />${esc(dateTime(c.availableFrom))} – ${esc(dateTime(c.availableUntil))}</p></div>`).join('');configReady=true;$('#form-message').textContent='';}catch(error){$('#form-message').textContent=error.message;}}
 
-start.addEventListener("click", async () => {
-  start.disabled = true;
-  const response = await fetch("/api/demo", { method: "POST" });
-  const body = await response.json();
-  requestId = body.requestId;
-  requestIdText.textContent = `Workflow ID: ${requestId}`;
-  start.hidden = true;
-  pollTimer = setInterval(() => refresh().catch(console.error), 500);
-  await refresh();
-});
+function renderClient(){
+ const {opening,offer,workflowStatus,confirmedClient}=clientState;
+ const valid=offer.status==='waiting'&&workflowStatus==='waiting'&&offer.deadline>Date.now();
+ const accepted=offer.status==='accepted'&&workflowStatus==='filled'&&(!confirmedClient||confirmedClient.id===offer.clientId);
+ let content;
+ if(accepted){content=`<div class="client-outcome"><h3>You’re booked, ${esc(offer.clientName)}.</h3><p>Your earlier appointment is confirmed. We look forward to seeing you at ${esc(fmt(opening.startsAt,{hour:'numeric',minute:'2-digit'}))}.</p></div>`;}
+ else if(valid){content=`<div class="deadline-box"><p>PLEASE RESPOND BY</p><strong>${esc(dateTime(offer.deadline))}</strong><span class="countdown" data-deadline="${Number(offer.deadline)}"></span></div><p class="client-explanation">This time is being offered to you. Accept before the deadline to confirm it automatically. Only accept if you can arrive for the appointment.</p><div class="client-actions"><button class="button primary" id="accept-offer" ${responding?'disabled':''}>${responding?'Checking your response…':'Yes, book this appointment'}</button><button class="button secondary" id="decline-offer" ${responding?'disabled':''}>No thanks, pass it on</button></div>`;}
+ else{let title='This offer has ended.',explanation='This appointment cannot be booked from this offer. Please contact the salon if you need help.';
+  if(offer.status==='declined'){title='Thanks for letting us know.';explanation='You declined this offer. You have not been booked for this appointment.';}
+  else if(workflowStatus==='canceled'||offer.status==='canceled'){title='This offer was canceled.';explanation='The salon stopped this offer process. You have not been booked for this appointment.';}
+  else if(offer.status==='timed_out'){title='The response deadline has passed.';explanation='This offer has expired and can no longer be accepted. You have not been booked for this appointment.';}
+  else if(offer.status==='waiting'&&offer.deadline<=Date.now()){title='The response window has ended.';explanation='We’re checking the final outcome. If you already responded, please wait for your booking status to update.';}
+  else if(offer.status==='delivery_failed'){title='This offer could not be delivered.';explanation='Both simulated delivery attempts failed. This offer is no longer available.';}
+  else if(workflowStatus==='filled'){title='This opening has been filled.';explanation='The appointment is no longer available. You have not been booked from this offer.';}
+  content=`<div class="client-outcome closed"><h3>${title}</h3><p>${explanation}</p></div><p class="client-explanation">Offer deadline: ${esc(dateTime(offer.deadline))}</p>`;
+ }
+ const markup=`<section class="panel client-card"><p class="client-greeting">${accepted?'CONFIRMED IN THIS DEMO':`Hello, ${esc(offer.clientName)}.`}</p><h2>${esc(opening.service)}</h2><div class="client-appointment"><p>${esc(dateTime(opening.startsAt))}</p><p>With ${esc(opening.stylist)} · ${esc(opening.durationMinutes)} minutes</p></div>${content}<p class="client-message" id="response-message" role="status" aria-live="polite"></p></section>`;
+ if(markup!==lastClientMarkup){const focusId=document.activeElement?.id;$('#client-content').innerHTML=markup;lastClientMarkup=markup;if(focusId&&document.getElementById(focusId))document.getElementById(focusId).focus({preventScroll:true});}document.querySelectorAll('[data-deadline]').forEach(el=>{el.textContent=countdown(Number(el.dataset.deadline));});
+}
+async function refreshClient(){if(refreshBusy||responding)return;refreshBusy=true;try{clientState=await api(`/api/openings/${encode(openingId)}/offers/${encode(offerId)}`);renderClient();$('#client-connection').textContent='';}catch(error){$('#client-connection').textContent=error.message;if(!clientState)$('#client-content').innerHTML='<section class="panel client-card"><h2>We couldn’t load this offer.</h2><p class="client-explanation">Check the offer link or try again in a moment. We can’t verify your booking status yet.</p></section>';}finally{refreshBusy=false;}}
+async function respond(response){if(responding||!clientState)return;responding=true;renderClient();let message='';try{const result=await api(`/api/openings/${encode(openingId)}/respond`,{method:'POST',body:JSON.stringify({offerId,clientId:clientState.offer.clientId,response})});message=result.message||(result.ok?'Your response has been received.':'This offer could not be accepted.');}catch(error){message=error.message;}finally{responding=false;}await refreshClient();if($('#response-message'))$('#response-message').textContent=message;}
 
-continueButton.addEventListener("click", async () => {
-  continueButton.disabled = true;
-  await fetch(`/api/demo/${requestId}/continue`, { method: "POST" });
-  await refresh();
-});
-
+if(isClient){$('#staff-view').hidden=true;$('#client-view').hidden=false;$('#view-label').textContent='YOUR INVITATION';$('#client-content').addEventListener('click',event=>{if(event.target.closest('#accept-offer'))respond('accept');if(event.target.closest('#decline-offer'))respond('decline');});refreshClient();setInterval(refreshClient,2000);}
+else{
+ $('#today-date').textContent=fmt(Date.now(),{weekday:'long',month:'long',day:'numeric'});
+ $('#timezone-hint').textContent=`Times shown in ${Intl.DateTimeFormat().resolvedOptions().timeZone.replaceAll('_',' ')}.`;
+ const soon=new Date(Date.now()+3600000);soon.setSeconds(0,0);$('#starts-at').value=localInputDate(soon);$('#starts-at').min=localInputDate(new Date());$('#starts-at').max=localInputDate(new Date(Date.now()+48*3600000));
+ $('#opening-form').addEventListener('submit',async event=>{event.preventDefault();const startDate=new Date($('#starts-at').value);if(!Number.isFinite(startDate.getTime())||startDate.getTime()<=Date.now()){$('#form-message').textContent='Choose an appointment time in the future.';return;}const button=$('#start-button');button.disabled=true;button.textContent='Starting outreach…';$('#form-message').textContent='';try{await api('/api/openings',{method:'POST',body:JSON.stringify({service:$('#service').value,stylist:$('#stylist').value,startsAt:startDate.toISOString(),scenario:$('#scenario').value})});await refreshStaff();$('#form-message').textContent='Outreach started. Follow its progress in Your openings.';}catch(error){$('#form-message').textContent=error.message;}finally{button.disabled=false;button.innerHTML='Start finding a client <span aria-hidden="true">↗</span>';}});
+ $('#openings-list').addEventListener('click',async event=>{const button=event.target.closest('[data-cancel]');if(!button||button.disabled)return;button.disabled=true;button.textContent='Canceling…';try{const result=await api(`/api/openings/${encode(button.dataset.cancel)}/cancel`,{method:'POST'});if(result.ok===false)throw new Error(result.message||'Could not cancel this opening.');await refreshStaff();}catch(error){$('#connection-status').textContent=error.message;$('#connection-status').classList.add('error');button.disabled=false;button.textContent='Cancel outreach';}});
+ $('#refresh-button').addEventListener('click',()=>{loadConfig();refreshStaff();});loadConfig();refreshStaff();setInterval(()=>{if(!configReady)loadConfig();refreshStaff();},2000);
+}
+setInterval(()=>{document.querySelectorAll('[data-deadline]').forEach(el=>{el.textContent=countdown(Number(el.dataset.deadline));});if(isClient&&clientState&&clientState.offer.status==='waiting'&&clientState.offer.deadline<=Date.now()&&!responding)renderClient();},1000);

@@ -1,33 +1,12 @@
 <!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Temporal assessment starter</title>
-    <link rel="stylesheet" href="/styles.css" />
-  </head>
-  <body>
-    <main>
-      <p class="eyebrow">Temporal assessment starter</p>
-      <h1>Your environment is connected.</h1>
-      <p class="intro">
-        This neutral demonstration starts a Workflow, waits durably for a
-        Signal, and then completes. Replace it with the experience your
-        customer needs.
-      </p>
-      <section class="card">
-        <h2 id="phase">Ready</h2>
-        <p id="message">Start the demonstration to verify the setup.</p>
-        <button id="start">Start demo Workflow</button>
-        <button id="continue" hidden>Send continue Signal</button>
-        <p class="request-id" id="request-id"></p>
-      </section>
-      <p class="footer">
-        Inspect the execution at
-        <a href="http://localhost:8233" target="_blank">localhost:8233</a>.
-      </p>
-    </main>
-    <script src="/app.js"></script>
-  </body>
-</html>
-
+<html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="theme-color" content="#244b3d" /><title>Juniper Salon · A little room for you</title><link rel="stylesheet" href="/styles.css" /></head>
+<body>
+<header class="site-header"><a class="brand" href="/" aria-label="Juniper Salon home"><span class="brand-mark" aria-hidden="true">j.</span><span>juniper<span class="brand-sub">S A L O N</span></span></a><span class="header-label" id="view-label">THE FRONT DESK</span></header>
+<div class="demo-banner"><span class="demo-dot"></span> Working prototype · Sample clients · All messages are simulated</div>
+<main id="staff-view" class="workspace">
+<section class="hero"><div><p class="eyebrow">A LITTLE LESS CHASING. A LITTLE MORE CARE.</p><h1>Make room for<br /><em>someone waiting.</em></h1><p class="intro">Turn an unexpected opening into a welcome appointment.<br />One offer at a time, with everyone kept in the loop.</p></div><aside class="today-note"><span class="note-flower" aria-hidden="true">✳</span><p>More time for<br /><strong>the people in your chair.</strong></p><span id="today-date"></span></aside></section>
+<section class="summary-grid" aria-label="Prototype opening counts"><div class="summary-stat"><span class="stat-label">IN PROGRESS</span><strong id="count-active">—</strong><span>Offers being managed</span></div><div class="summary-stat"><span class="stat-label">FILLED</span><strong id="count-filled">—</strong><span>Confirmed in this demo</span></div><div class="summary-stat"><span class="stat-label">NEEDS ATTENTION</span><strong id="count-attention">—</strong><span>Openings to review</span></div><div class="summary-goal"><p class="eyebrow">DEMO REFILL RATE</p><strong id="refill-rate" role="status">Loading outcomes…</strong><p class="refill-target">Pilot target: 50%</p><p id="refill-excluded" class="refill-detail"></p><details class="refill-explanation"><summary>How this is measured</summary><p>Filled ÷ (filled + unfilled) completed demo outreach workflows. A real pilot must track all eligible cancellation openings, including those without outreach.</p></details><p>Simulated bookings—not real business results.</p></div></section>
+<div class="dashboard-grid"><aside class="setup-column"><section class="panel new-opening"><div class="section-kicker">01 / START HERE</div><h2>An opening to fill</h2><p class="section-description">Add the canceled appointment. We’ll find suitable clients in the order they joined.</p><form id="opening-form"><label for="service">Service</label><select id="service" name="service" required disabled><option value="">Loading services…</option></select><label for="stylist">Stylist</label><select id="stylist" name="stylist" required disabled><option value="">Loading stylists…</option></select><label for="starts-at">Appointment date & time</label><input id="starts-at" name="startsAt" type="datetime-local" required /><p class="field-hint" id="timezone-hint"></p><div class="rule-note"><span aria-hidden="true">◷</span><p>Each client gets up to <strong>15 minutes</strong> to reply. Offers always expire by the appointment start.</p></div><details class="demo-controls"><summary>Demo delivery scenarios</summary><label for="scenario">First eligible client’s message</label><select id="scenario"><option value="normal">Delivered successfully</option><option value="retry_once">First attempt fails; retry succeeds</option><option value="delivery_failure">Both attempts fail; move to next client</option></select><p class="field-hint">Only simulated delivery changes. Real response deadlines still apply.</p></details><p class="form-message" id="form-message" role="status" aria-live="polite"></p><button type="submit" class="button primary full-width" id="start-button" disabled>Start finding a client <span aria-hidden="true">↗</span></button></form></section><details class="panel sample-panel"><summary><span>Sample waitlist</span><span class="small-count" id="sample-count">—</span></summary><p class="section-description">Reference data for this demo. Only clients matching the service, time, and stylist are considered.</p><div id="sample-clients"></div></details></aside>
+<section class="openings-section" aria-labelledby="openings-heading"><div class="section-heading"><div><div class="section-kicker">02 / KEEP EVERYONE IN THE LOOP</div><h2 id="openings-heading">Your openings</h2></div><button class="text-button" type="button" id="refresh-button">↻ Refresh</button></div><p class="connection-status" id="connection-status" role="status" aria-live="polite">Connecting to your front desk…</p><div id="openings-list"><div class="empty-state"><div class="empty-symbol" aria-hidden="true">✳</div><h3>A little breathing room.</h3><p>Your openings will appear here.<br />Add one to start matching it with your waitlist.</p></div></div></section></div>
+<footer class="staff-footer"><span>Juniper Salon · A calmer way to fill the day.</span><a href="http://localhost:8233" target="_blank" rel="noopener">Inspect Temporal history ↗</a></footer></main>
+<main id="client-view" class="client-workspace" hidden><p class="eyebrow">A LITTLE ROOM FOR YOU</p><h1>Your next<br /><em>good hair day.</em></h1><p class="client-intro">An earlier appointment at Juniper Salon.</p><div id="client-content"><section class="panel client-card"><p>Finding your offer…</p></section></div><p class="client-connection" id="client-connection" role="status" aria-live="polite"></p><p class="client-footnote">This is a demonstration using sample clients.<br />No real text message or calendar booking is sent.</p><a class="back-link" href="/">← Back to the staff demo</a></main><script src="/app.js"></script></body></html>

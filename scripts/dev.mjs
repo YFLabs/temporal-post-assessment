@@ -28,8 +28,8 @@ async function waitForPort(port, timeoutMs = 60_000) {
 
 await waitForPort(7233);
 const children = [
-  spawn("npm", ["run", "dev:worker"], { stdio: "inherit" }),
-  spawn("npm", ["run", "dev:api"], { stdio: "inherit" }),
+  spawn(process.execPath, ["--import", "tsx", "src/worker.ts"], { stdio: "inherit" }),
+  spawn(process.execPath, ["--import", "tsx", "src/api.ts"], { stdio: "inherit" }),
 ];
 let shuttingDown = false;
 function shutdown(exitCode = 0) {
@@ -48,7 +48,6 @@ for (const child of children) {
     }
   });
 }
-console.log("\nStarter is launching:");
+console.log("\nJuniper Salon is launching:");
 console.log("  App:         http://localhost:3000");
 console.log("  Temporal UI: http://localhost:8233\n");
-

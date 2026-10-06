@@ -1,0 +1,61 @@
+{
+  "startedAt": "2026-10-06T03:30:18.381Z",
+  "completedAt": "2026-10-06T03:30:25.710Z",
+  "cases": [
+    {
+      "name": "service health reports simulated messaging",
+      "status": "passed",
+      "durationMs": 31
+    },
+    {
+      "name": "malformed JSON, oversized bodies, invalid shapes, and timestamp coercion are rejected",
+      "status": "passed",
+      "durationMs": 36
+    },
+    {
+      "name": "parallel duplicate starts share one Workflow and conflicting service returns 409",
+      "status": "passed",
+      "durationMs": 2043
+    },
+    {
+      "name": "wrong client cannot accept; decline advances and stale acceptance returns 409",
+      "status": "passed",
+      "durationMs": 189
+    },
+    {
+      "name": "concurrent duplicate acceptance is idempotent with exactly one confirmation",
+      "status": "passed",
+      "durationMs": 59
+    },
+    {
+      "name": "staff cancellation closes the offer and subsequent acceptance is rejected",
+      "status": "passed",
+      "durationMs": 79
+    },
+    {
+      "name": "simultaneous acceptance and cancellation choose one immutable terminal outcome",
+      "status": "passed",
+      "durationMs": 76
+    },
+    {
+      "name": "retry-once scenario sends exactly twice before waiting",
+      "status": "passed",
+      "durationMs": 1095
+    },
+    {
+      "name": "two delivery failures alert staff and advance to the next client",
+      "status": "passed",
+      "durationMs": 1120
+    },
+    {
+      "name": "appointment-start deadline expires in real time and cannot create a late booking",
+      "status": "passed",
+      "durationMs": 2568
+    },
+    {
+      "name": "all smoke-test openings finish filled, canceled, or unfilled",
+      "status": "passed",
+      "durationMs": 29
+    }
+  ]
+}

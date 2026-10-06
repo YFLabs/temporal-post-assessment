@@ -1,0 +1,21 @@
+{
+  "before": {
+    "recordedAt": "2026-10-06T03:22:49.990Z",
+    "workflowId": "juniper-a628e3240aefef0c1a711ce1",
+    "offerId": "juniper-a628e3240aefef0c1a711ce1-offer-nora",
+    "deadline": 1791257869968,
+    "sentAt": 1791256969968,
+    "offerCount": 1,
+    "deliveryEvents": 1
+  },
+  "after": {
+    "recordedAt": "2026-10-06T03:23:34.271Z",
+    "statusBeforeCleanup": "waiting",
+    "sameOffer": true,
+    "sameDeadline": true,
+    "sameDeliveryReceipt": true,
+    "noDuplicateDelivery": true,
+    "cleanup": "Canceled after verification"
+  },
+  "result": "passed"
+}
